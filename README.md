@@ -1,0 +1,2 @@
+# OFDM_simulation
+OFDM物理层仿真，使用matlab，后续会使用Gnuradio和USRP进一步仿真
