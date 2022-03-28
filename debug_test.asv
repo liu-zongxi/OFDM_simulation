@@ -27,8 +27,9 @@ Tau_maxTDL = Delay(end)+1;          % 最大时延除以帧长,就是归一化�
         end
         frame_ifft = zeros(Nk, Nframe);
         for jj = 1:Nframe
-            frame_ifft = ifft(frame_mod_shift, Nfft);
+            frame_mod_shift(:,jj) = ifftshift(frame_mod(:,jj));         % 频域归零
         end
+        frame_ifft = ifft(frame_mod_shift, Nfft);
         % 添加保护间隔
         frame_withGI = AddGI(frame_ifft, Nfft, NGI, Nframe, "CP");  % 添加保护间隔
         % 并串转换
@@ -46,12 +47,9 @@ Tau_maxTDL = Delay(end)+1;          % 最大时延除以帧长,就是归一化�
         % FFT
 %         frame_noGI_shift = fftshift(frame_ifft);
 %         frame_recieved_FD = fftshift(fft(frame_noGI_shift, Nfft));
-        frame_recieved_FD = zeros(Nk, Nframe);
-        for jj = 1:Nframe
-            frame_recieved_FD(:, jj) = fftshift(fft(frame_noGI(:, jj), Nfft));
-        end
+        frame_recieved_FD = fft(frame_noGI, Nfft);
         % 信道均衡
-        H = fftshift(fft([h zeros(1, Nfft-Tau_maxTDL)].', Nfft));
+        H = fft([h zeros(1, Nfft-Tau_maxTDL)].', Nfft);
         frame_equalization = frame_recieved_FD ./ repmat(H, 1, Nframe);
         % QPSK解调
         frame_demod = QPSKDemod(frame_equalization, Nk, Nframe);

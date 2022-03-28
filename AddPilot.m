@@ -1,7 +1,7 @@
 %-----------------------在数据中插入导频-------------------%
 %-----------------------author:lzx-------------------------%
 %-----------------------date:2022年3月27日22:16:56--------%
-function outputs = AddPilot(input_data, l_pilot, start_pilot, value_pilot, npilot,nused, nframe)
+function [X_pilot, outputs] = AddPilot(input_data, l_pilot, start_pilot, value_pilot, npilot,nused, nframe)
 % 输入
 % input_data: 
 % l_pilot：导频间隔长度
@@ -12,6 +12,7 @@ function outputs = AddPilot(input_data, l_pilot, start_pilot, value_pilot, npilo
 % nused: 一个OFDM符号发送了多少数据
 % 输出
 % outputs: 被插入了导频的数据
+% X_pilot: 导频长啥样，用于信道估计
 
 
 % 初始化一下outputs
@@ -25,5 +26,7 @@ indexs_data(indexs_pilot) = [];       % 删掉导频所在位置，就是数据�
 outputs(indexs_pilot, 1:nframe) = value_pilot;
 % 再把数据放到该放的位置
 outputs(indexs_data, 1:nframe) = input_data;
-
+% 最后，返回一下X_pilot,方便最后的估计， 由于用于估计，他应该添加fftshift
+X_pilot = zeros(length(indexs_pilot),nframe);
+X_pilot(:,:) = value_pilot;
 end

@@ -15,7 +15,7 @@ BR = SR .* Npsk;       % 比特率
 NGI = 32;           % 保护间隔长度
 Nsym = Nfft+NGI;    % 系统长度
 % 信噪比相关参数
-EbN0s = 1:1:50;      % 信噪比
+EbN0s = 1:1:30;      % 信噪比
 bers_perfect = zeros(1,length(EbN0s));      % 误码率储存数组
 bers_LS = zeros(1,length(EbN0s));      % 误码率储存数组
 % 信道相关参数
