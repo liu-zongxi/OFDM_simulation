@@ -7,8 +7,8 @@ function [output_pilot, indexs_pilot_compensation] = InterpolateCompensation(inp
 % indexs_pilot：导频所在的位置
 % length_H：需要补偿的长度，也就是Nused+Npilot
 % nframe: 一个发送多少个OFDM符号
-% 输出
 
+% 输出
 % output_pilot：(Npilot+1, Nframe)补偿了头或者尾的导频
 % indexs_pilot_compensation： 补偿了头尾的导频位置
 head_compensation = zeros(1, nframe);

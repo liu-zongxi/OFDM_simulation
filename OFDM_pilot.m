@@ -18,6 +18,8 @@ Nsym = Nfft+NGI;    % 系统长度
 EbN0s = 1:1:50;      % 信噪比
 bers_perfect = zeros(1,length(EbN0s));      % 误码率储存数组
 bers_LS = zeros(1,length(EbN0s));      % 误码率储存数组
+bers_DFT = zeros(1,length(EbN0s));      % 误码率储存数组
+bers_MMSE = zeros(1,length(EbN0s));      % 误码率储存数组
 % 信道相关参数
 PowerTDL_dB = [0 -8 -17 -21 -25];   % TDL中信道抽头的功率,dB为单位
 Delay = [0 3 5 6 8];                % TDL中信道时延
@@ -37,9 +39,13 @@ for kk = 1:length(EbN0s)
     nloop = 10000;          % 发送多少帧
     n_biterror_perfect = 0;         % 错误的数据
     n_biterror_LS = 0;         % 错误的数据
+    n_biterror_DFT = 0;         % 错误的数据
+    n_biterror_MMSE = 0;         % 错误的数据
     n_bitdata = 0;          % 一共发送了多少数据
     n_packeterror_perfect = 0;      % 有多少错误帧
     n_packeterror_LS = 0;      % 有多少错误帧
+    n_packeterror_DFT = 0;      % 有多少错误帧
+    n_packeterror_MMSE = 0;      % 有多少错误帧
     n_packetdata = 0;       % 发送了多少帧
     for ii = 1:nloop
 %--------------------------发射端-------------------------------%
@@ -91,26 +97,44 @@ for kk = 1:length(EbN0s)
         frame_recieved_FD = fftshift(frame_recieved_FD_shift);
         % frame_recieved_FD = fft(frame_noGI, Nfft);
         % 信道估计，包含两个部分，导频估计和插值
-        H_LS_linear = ChannelEstimation_LS(frame_recieved_FD, X_pilot, Npilot, L_pilot, start_pilot, Nused, Nframe);
         H = fftshift(fft([h zeros(1, Nfft-Tau_maxTDL)].', Nfft));
+        Rhh = H*H';
+        H_LS_linear = ChannelEstimation_LS(frame_recieved_FD, X_pilot, Npilot, L_pilot, start_pilot, Nused, Nframe);
+        H_MMSE = ChannelEstimation_MMSE(H_LS_linear, Rhh, Nused, Npilot, Nframe, EbN0);
+        % 做DFT滤除噪声
+        h_LS = ifft(ifftshift(H_LS_linear),Nfft);
+        h_LS_DFT = h_LS(1:Tau_maxTDL, :);
+        H_LS_DFT = fftshift(fft(h_LS_DFT, Nfft));
         % 信道均衡
         frame_equalization_perfect = frame_recieved_FD ./ repmat(H, 1, Nframe);
         frame_equalization_LS = frame_recieved_FD ./ H_LS_linear;
+        frame_equalization_DFT = frame_recieved_FD ./ H_LS_DFT;
+        frame_equalization_MMSE = frame_recieved_FD ./ H_MMSE;
         % 去除导频
         frame_no_pilot_perfect = RemovePilot(frame_equalization_perfect, L_pilot, start_pilot, Npilot);
         frame_no_pilot_LS = RemovePilot(frame_equalization_LS, L_pilot, start_pilot, Npilot);
+        frame_no_pilot_DFT = RemovePilot(frame_equalization_DFT, L_pilot, start_pilot, Npilot);
+        frame_no_pilot_MMSE = RemovePilot(frame_equalization_MMSE, L_pilot, start_pilot, Npilot);
         % QPSK解调
         frame_demod_perfect = QPSKDemod(frame_no_pilot_perfect, Nused, Nframe);
         frame_demod_LS = QPSKDemod(frame_no_pilot_LS, Nused, Nframe);
+        frame_demod_DFT = QPSKDemod(frame_no_pilot_DFT, Nused, Nframe);
+        frame_demod_MMSE = QPSKDemod(frame_no_pilot_MMSE, Nused, Nframe);
         % 并串转换
         frame_output_perfect = reshape(frame_demod_perfect, 1, Nused*Nframe*Npsk);
         frame_output_LS = reshape(frame_demod_LS, 1, Nused*Nframe*Npsk);
+        frame_output_DFT = reshape(frame_demod_DFT, 1, Nused*Nframe*Npsk);
+        frame_output_MMSE = reshape(frame_demod_MMSE, 1, Nused*Nframe*Npsk);
         % 计算error
         n_biterror_perfect_tmp = sum(abs(frame_output_perfect-frame_FDserial));
         n_biterror_LS_tmp = sum(abs(frame_output_LS-frame_FDserial));
+        n_biterror_DFT_tmp = sum(abs(frame_output_DFT-frame_FDserial));
+        n_biterror_MMSE_tmp = sum(abs(frame_output_MMSE-frame_FDserial));
         n_bitdata_tmp = length(frame_FDserial);
         n_biterror_perfect = n_biterror_perfect + n_biterror_perfect_tmp;
         n_biterror_LS = n_biterror_LS + n_biterror_LS_tmp;
+        n_biterror_DFT = n_biterror_DFT + n_biterror_DFT_tmp;
+        n_biterror_MMSE = n_biterror_MMSE + n_biterror_MMSE_tmp;
         n_bitdata = n_bitdata + n_bitdata_tmp;
         if n_biterror_perfect_tmp ~= 0
             n_packeterror_perfect = n_packeterror_perfect + 1;
@@ -118,24 +142,43 @@ for kk = 1:length(EbN0s)
         if n_biterror_LS_tmp ~= 0
             n_packeterror_LS = n_packeterror_LS + 1;
         end
+        if n_biterror_DFT_tmp ~= 0
+            n_packeterror_DFT = n_packeterror_DFT + 1;
+        end
+        if n_biterror_MMSE_tmp ~= 0
+            n_packeterror_MMSE = n_packeterror_MMSE + 1;
+        end
         n_packetdata = n_packetdata + 1;
     end
     % 计算在当前信噪比下的误码率
     per_perfect = n_packeterror_perfect/n_packetdata;
     per_LS = n_packeterror_LS/n_packetdata;
+    per_DFT = n_packeterror_DFT/n_packetdata;
+    per_MMSE = n_packeterror_MMSE/n_packetdata;
     ber_perfect = n_biterror_perfect/n_bitdata;
     ber_LS = n_biterror_LS/n_bitdata;
+    ber_DFT = n_biterror_DFT/n_bitdata;
+    ber_MMSE = n_biterror_MMSE/n_bitdata;
     bers_perfect(kk)=ber_perfect;
     bers_LS(kk)=ber_LS;
-    fprintf('%f\t%e\t%e\t%e\t%e\t%d\t\n',EbN0,ber_perfect,ber_LS,per_perfect,per_LS,nloop);
+    bers_DFT(kk)=ber_DFT;
+    bers_MMSE(kk)=ber_MMSE;
+    fprintf('%f\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%d\t\n',EbN0,ber_perfect,ber_LS,ber_DFT, ber_MMSE, per_perfect,per_LS,per_DFT, per_MMSE, nloop);
 end
 save("BERofdm_perfect.mat",'bers_perfect');
 save("BERofdm_LS.mat",'bers_LS');
+save("BERofdm_DFT.mat",'bers_DFT');
+save("BERofdm_MMSE.mat",'bers_MMSE');
 %% 画图
 % bers = load(!"BERofdm_rayleigh.mat").bers;
-rayleigh_theory = 0.5.*(1-(1-(1./(10.^(EbN0s./10).*(48/80)+1))).^0.5);
-semilogy(EbN0s,rayleigh_theory,'-*',EbN0s,bers_perfect,'-+',EbN0s,bers_LS,'-^');
+EbN0s = 1:1:50;      % 信噪比
+bers_perfect = load("BERofdm_perfect.mat").bers_perfect;
+bers_LS = load("BERofdm_LS.mat").bers_LS;
+bers_DFT = load("BERofdm_DFT.mat").bers_DFT;
+bers_MMSE = load("BERofdm_MMSE.mat").bers_MMSE;
+rayleigh_theory = 0.5.*(1-(1-(1./(10.^(EbN0s./10).*(96/128)+1))).^0.5);
+semilogy(EbN0s,rayleigh_theory,'-*',EbN0s,bers_perfect,'-+',EbN0s,bers_LS,'-^', EbN0s,bers_DFT,'->', EbN0s,bers_MMSE,'-<');
 xlabel('比特信噪比');
 ylabel('误码率');
 title('不同信噪比下误码率仿真曲线');
-legend('理论曲线','实验曲线');
+legend('理论曲线','perfect', "LS", "LS-DFT", "MMSE");
