@@ -3,6 +3,7 @@
 %-------------------date:2022年4月1日-----------------------%
 %% 设置参数
 clear;clc;clf;
+Nframe = 1;
 Nk = 128;           % 子载波个数
 Nfft = 128;          % fft长度
 CR = 1.2;
@@ -28,11 +29,13 @@ WW=[10 1 10]; % Stopband/Passband/Stopband weight vector
 h = firpm(Norder,FF/(Fs/2),[0 0 1 1 0 0],WW,{dens});
 %%
 X_mod = ModSymbolGenerator(Nmod, Nk);       % 生成信号，Nk个
-X_mod(1) = 0;                               % 去除直流分量
-x = IFFTOversampling(X_mod, Nfft, Nos);     % ifft+过采样，得到的时域信号长度为Nfft*Nos,输入时频域分居两侧
+X_oversampling = [zeros(1, Nframe); X_mod(Nk/2+1:Nk,:); zeros(Nk*(Nos-1)-1,Nframe); X_mod(1:Nk/2,:)];
+x = ifft(X_oversampling, Nfft*Nos);
+% X_mod(1) = 0;                               % 去除直流分量
+%x = IFFTOversampling(X_mod, Nfft, Nos);     % ifft+过采样，得到的时域信号长度为Nfft*Nos,输入时频域分居两侧
 x_GI = AddGI(x, Nfft*Nos, NGI*Nos, 1, "CP");% 添加GI，也要过采样
 x_os = [zeros((Nfft/2-NGI)*Nos,1); x_GI; zeros(Nfft*Nos/2,1)];% 这不是过采样，而是为了展示CP而不得已看两个周期的x而做的补零
-x_passband = real(x_os.*exp(1j*2*wc*t));    % 上变频
+x_passband = real(x_os.*exp(1j*wc*t));    % 上变频
 x_clipped = Clipping(x_passband,CR);        % 限幅
 X_filter= fft(filter(h,1,x_clipped));       % 先滤波再fft?
 x_filter = ifft(X_filter);                  % 变回去

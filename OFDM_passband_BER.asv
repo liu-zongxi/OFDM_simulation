@@ -4,10 +4,10 @@
 %% 设置参数
 clear; clf; clc;
 % 信噪比
-SNRdBs=[10:10];
+SNRdBs=[0:10];
 N_SNR=length(SNRdBs);
 % OFDM相关
-Maxiter = 1;          % 信噪比迭代次数
+Maxiter = 1000;          % 信噪比迭代次数
 CRs=[0.8:0.2:1.6];      % 限幅系数，他会被用于RMS的相乘限幅
 N_CR=length(CRs);
 gss='*^<sd>v';
@@ -16,7 +16,7 @@ M = 2^Nmod;             % 调制阶数
 Nk = 128;               % 子载波次数，一般Nk=Nfft
 Nfft = 128; 
 NGI = 32;               % GI长度
-Nframe = 1;             % 一帧6个符号
+Nframe = 6;             % 一帧6个符号
 Nsym = Nfft + NGI;      % 系统长度
 % 采样
 fs = 1e6;               % 采样次数，也就是两个点直接距离
@@ -35,22 +35,20 @@ h = firpm(Norder,FF/(Fs/2),[0 0 1 1 0 0],WW,{dens});
 % 初始化一些储存数组
 CF = zeros(Maxiter,1);
 % 一些位置
-
+bers = zeros(N_CR, N_)
 %% 主函数
 for ii = 1:N_SNR
     SNR = SNRdBs(ii);
     for kk = 1:N_CR
         CR = CRs(kk);
+        nobe = 0;
         for jj = 1:Maxiter
             % 生成一帧数据，串并转换，并QPSK，生成一帧
-            Frame_FDserial = ones(1, Nk*Nframe*Nmod);
-            % Frame_FDserial = rand(1,Nk*Nframe*Nmod) > 0.5;     % 发送的是bit
+            Frame_FDserial = rand(1,Nk*Nframe*Nmod) > 0.5;     % 发送的是bit
             Frame_FDparallel = reshape(Frame_FDserial,Nk,Nframe*Nmod);% 串并转换
             Frame_mod = QPSKMod(Frame_FDparallel,Nk,Nframe);     %调制
             % 做过采样ifft
             % https://blog.csdn.net/sinat_38151275/article/details/85268026
-            % Frame_oversampling = Frame_mod;
-            % Frame_oversampling = [Frame_mod; zeros((Nos-1)*Nfft, Nframe)];
             Frame_oversampling = [zeros(1, Nframe); Frame_mod(Nk/2+1:Nk,:); zeros(Nk*(Nos-1)-1,Nframe); Frame_mod(1:Nk/2,:)];
             frame = ifft(Frame_oversampling, Nfft*Nos);
 %             Frame_mod(1,:) = 0+1j*0;                                    % 没有直流分量
@@ -58,31 +56,32 @@ for ii = 1:N_SNR
             frame_GI = AddGI(frame, Nfft*Nos, NGI*Nos, Nframe, "CP");  % 添加保护间隔
             frame_serial = reshape(frame_GI, Nframe*Nsym*Nos, 1);   % 程序写的有点问题，只能都按列来了
             % frame_padding = [zeros((Nfft/2-NGI)*Nos, Nframe); frame_GI; zeros(Nfft*Nos/2, Nframe)];
-            frame_passband =  sqrt(2)*real(frame_serial.*exp(1j*wc*ts));
-            frame_clipped = frame_passband;
-            % frame_clipped = Clipping(frame_passband, CR);
-            % frame_filter = frame_clipped;
+            frame_passband = sqrt(2) .* real(frame_serial.*exp(1j*wc*ts));
+            % frame_clipped = frame_passband;
+            frame_clipped = Clipping(frame_passband, CR);
+            frame_filter = frame_clipped;
             % frame_filter = ifft(fft(h.',size(frame_clipped, 1)).*fft(frame_clipped));      % 滤波原理
             if ii == N_SNR
                 CF(jj,1) = PAPR_dB(frame_filter);
             end
             % 加噪声
-            frame_noise = frame_filter;
-            % frame_noise = awgn(frame_filter,SNR,'measured');   % add Noise(AWGN)
-            frame_baseband =  sqrt(2).*frame_noise.*exp(-1j*wc*ts);
+            % frame_noise = frame_filter;
+            frame_noise = awgn(frame_filter,SNR,'measured');   % add Noise(AWGN)
+            frame_baseband = sqrt(2) .* frame_noise.*exp(-1j*wc*ts);
             % frame_sample = frame_baseband(1+[0:Nos:Nsym*Nos*Nframe-1],1);
             frame_parallel = reshape(frame_baseband, Nsym*Nos, Nframe);
             frame_noGI = RemoveGI(frame_parallel, Nfft*Nos, NGI*Nos);
-            Frame_os = fft(frame_noGI,  Nfft*Nos)
-            % Frame = Frame_os;
+            Frame_os = fft(frame_noGI,  Nfft*Nos);
             Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
-            % Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
             % Frame = fft(frame_parallel, Nfft);
 %             for kkk = 1: Nframe
 %                 Frame(:,kkk) = fftshift(Frame(:,kkk));
 %             end
             Frame_demod = QPSKDemod(Frame, Nfft, Nframe);
-            biterr(Frame_FDparallel,Frame_demod)
+            nobe = nobe + biterr(Frame_FDparallel(2:end,:),Frame_demod(2:end,:));
+
+            % nobe = nobe + biterr(Frame_FDparallel(2:end,:),Frame_demod(2:end,:)); 
         end
+
     end
 end

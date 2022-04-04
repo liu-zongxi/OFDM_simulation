@@ -7,7 +7,7 @@ clear; clf; clc;
 SNRdBs=[10:10];
 N_SNR=length(SNRdBs);
 % OFDM相关
-Maxiter = 1;          % 信噪比迭代次数
+Maxiter = 100;          % 信噪比迭代次数
 CRs=[0.8:0.2:1.6];      % 限幅系数，他会被用于RMS的相乘限幅
 N_CR=length(CRs);
 gss='*^<sd>v';
@@ -49,33 +49,33 @@ for ii = 1:N_SNR
             Frame_mod = QPSKMod(Frame_FDparallel,Nk,Nframe);     %调制
             % 做过采样ifft
             % https://blog.csdn.net/sinat_38151275/article/details/85268026
-            % Frame_oversampling = Frame_mod;
-            % Frame_oversampling = [Frame_mod; zeros((Nos-1)*Nfft, Nframe)];
-            Frame_oversampling = [zeros(1, Nframe); Frame_mod(Nk/2+1:Nk,:); zeros(Nk*(Nos-1)-1,Nframe); Frame_mod(1:Nk/2,:)];
+            Frame_oversampling = Frame_mod;
+            % Frame_oversampling = [Frame_mod; zeros((Nos-1)*Nfft, Nframe)]
+            % Frame_oversampling = [zeros(1, Nframe); Frame_mod(Nk/2+1:Nk,:); zeros(Nk*(Nos-1)-1,Nframe); Frame_mod(1:Nk/2,:)];
             frame = ifft(Frame_oversampling, Nfft*Nos);
 %             Frame_mod(1,:) = 0+1j*0;                                    % 没有直流分量
 %             frame = IFFTOversampling(Frame_mod, Nk, Nos);           % 过采样IFFT
             frame_GI = AddGI(frame, Nfft*Nos, NGI*Nos, Nframe, "CP");  % 添加保护间隔
             frame_serial = reshape(frame_GI, Nframe*Nsym*Nos, 1);   % 程序写的有点问题，只能都按列来了
             % frame_padding = [zeros((Nfft/2-NGI)*Nos, Nframe); frame_GI; zeros(Nfft*Nos/2, Nframe)];
-            frame_passband =  sqrt(2)*real(frame_serial.*exp(1j*wc*ts));
+            frame_passband =  real(frame_serial.*exp(1j*2*wc*ts));
             frame_clipped = frame_passband;
             % frame_clipped = Clipping(frame_passband, CR);
-            % frame_filter = frame_clipped;
-            % frame_filter = ifft(fft(h.',size(frame_clipped, 1)).*fft(frame_clipped));      % 滤波原理
+            frame_filter = frame_clipped;
+            % frame_filter = ifft(fft(h,size(frame_clipped, 1)).*fft(frame_clipped));      % 滤波原理
             if ii == N_SNR
                 CF(jj,1) = PAPR_dB(frame_filter);
             end
             % 加噪声
             frame_noise = frame_filter;
             % frame_noise = awgn(frame_filter,SNR,'measured');   % add Noise(AWGN)
-            frame_baseband =  sqrt(2).*frame_noise.*exp(-1j*wc*ts);
+            frame_baseband =  frame_noise.*exp(-1j*2*wc*ts);
             % frame_sample = frame_baseband(1+[0:Nos:Nsym*Nos*Nframe-1],1);
             frame_parallel = reshape(frame_baseband, Nsym*Nos, Nframe);
             frame_noGI = RemoveGI(frame_parallel, Nfft*Nos, NGI*Nos);
-            Frame_os = fft(frame_noGI,  Nfft*Nos)
-            % Frame = Frame_os;
-            Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
+            Frame_os = fft(frame_noGI,  Nfft*Nos);
+            Frame = Frame_os(1:Nfft,:)
+            % Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
             % Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
             % Frame = fft(frame_parallel, Nfft);
 %             for kkk = 1: Nframe
