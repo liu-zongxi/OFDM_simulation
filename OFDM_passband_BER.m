@@ -64,8 +64,8 @@ for ii = 1:N_SNR
             frame_passband = sqrt(2) .* real(frame_serial.*exp(1j*wc*ts));
             % frame_clipped = frame_passband;
             frame_clipped = Clipping(frame_passband, CR);
-            frame_filter = frame_clipped;
-            % frame_filter = ifft(fft(h.',size(frame_clipped, 1)).*fft(frame_clipped));      % 滤波原理
+            % frame_filter = frame_clipped;
+            frame_filter = ifft(abs(fft(h.',size(frame_clipped, 1))).*fft(frame_clipped));      % 滤波原理
             if ii == N_SNR
                 CF(1,jj) = PAPR_dB(frame_filter);
             end
@@ -97,6 +97,10 @@ for ii = 1:N_SNR
     end
 end
 %% 画图
+% figure(1)
+% plot(abs(fft(frame_clipped)));
+% figure(2)
+% plot(abs(fft(frame_filter))); hold off
 for kk = 1:N_CR
    gs = gss(kk);
    subplot(211), semilogy(Z_dBs,CCDF_CR(kk,:),[gs '-']), hold on

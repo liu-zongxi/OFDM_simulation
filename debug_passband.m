@@ -35,7 +35,7 @@ h = firpm(Norder,FF/(Fs/2),[0 0 1 1 0 0],WW,{dens});
 % 初始化一些储存数组
 CF = zeros(Maxiter,1);
 % 一些位置
-
+fft(h)
 %% 主函数
 for ii = 1:N_SNR
     SNR = SNRdBs(ii);
@@ -59,10 +59,10 @@ for ii = 1:N_SNR
             frame_serial = reshape(frame_GI, Nframe*Nsym*Nos, 1);   % 程序写的有点问题，只能都按列来了
             % frame_padding = [zeros((Nfft/2-NGI)*Nos, Nframe); frame_GI; zeros(Nfft*Nos/2, Nframe)];
             frame_passband =  sqrt(2)*real(frame_serial.*exp(1j*wc*ts));
-            frame_clipped = frame_passband;
-            % frame_clipped = Clipping(frame_passband, CR);
+            % frame_clipped = frame_passband;
+            frame_clipped = Clipping(frame_passband, CR);
             % frame_filter = frame_clipped;
-            % frame_filter = ifft(fft(h.',size(frame_clipped, 1)).*fft(frame_clipped));      % 滤波原理
+            frame_filter = ifft(abs(fft(h.',size(frame_clipped, 1))).*fft(frame_clipped));      % 滤波原理
             if ii == N_SNR
                 CF(jj,1) = PAPR_dB(frame_filter);
             end
@@ -71,9 +71,10 @@ for ii = 1:N_SNR
             % frame_noise = awgn(frame_filter,SNR,'measured');   % add Noise(AWGN)
             frame_baseband =  sqrt(2).*frame_noise.*exp(-1j*wc*ts);
             % frame_sample = frame_baseband(1+[0:Nos:Nsym*Nos*Nframe-1],1);
+
             frame_parallel = reshape(frame_baseband, Nsym*Nos, Nframe);
             frame_noGI = RemoveGI(frame_parallel, Nfft*Nos, NGI*Nos);
-            Frame_os = fft(frame_noGI,  Nfft*Nos)
+            Frame_os = fft(frame_noGI,  Nfft*Nos);
             % Frame = Frame_os;
             Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
             % Frame = [Frame_os(Nfft/2+Nfft*(Nos-1)+1:Nfft*Nos, :); Frame_os(2:Nfft/2+1, :)];
@@ -86,3 +87,5 @@ for ii = 1:N_SNR
         end
     end
 end
+plot(abs(fft(frame_serial)));hold on
+plot(abs(fft(frame_passband)));
