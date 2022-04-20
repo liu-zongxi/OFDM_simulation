@@ -15,7 +15,7 @@ Nmod = 2;               % 映射
 M = 2^Nmod;             % 调制阶数
 Nk = 128;               % 子载波次数，一般Nk=Nfft
 Nfft = 128; 
-NGI = 32;               % GI长度
+NGI = 0;               % GI长度
 Nframe = 1;             % 一帧6个符号
 Nsym = Nfft + NGI;      % 系统长度
 % 采样
@@ -24,9 +24,11 @@ Nos = 8;                % 过采样倍数
 Tsym = 1/(fs/Nsym);     % Nsym占了多长时间？
 Ts = 1/(fs*Nos);        % 采样周期
 ts = [0:Ts:Nframe*Tsym-Ts].';
+f=[0:fs/Nfft:Nos*fs-fs/Nfft]-Nos*fs/2;
 % 载波
 fc = 2e6;               % 上变频载波频率
 wc = 2*pi*fc;           % 角频率
+
 % 滤波器
 Fs=8; Norder=104; dens=20; 
 FF=[0 1.4 1.5 2.5 2.6 Fs/2];
@@ -35,7 +37,6 @@ h = firpm(Norder,FF/(Fs/2),[0 0 1 1 0 0],WW,{dens});
 % 初始化一些储存数组
 CF = zeros(Maxiter,1);
 % 一些位置
-fft(h)
 %% 主函数
 for ii = 1:N_SNR
     SNR = SNRdBs(ii);
@@ -43,8 +44,8 @@ for ii = 1:N_SNR
         CR = CRs(kk);
         for jj = 1:Maxiter
             % 生成一帧数据，串并转换，并QPSK，生成一帧
-            Frame_FDserial = ones(1, Nk*Nframe*Nmod);
-            % Frame_FDserial = rand(1,Nk*Nframe*Nmod) > 0.5;     % 发送的是bit
+            % Frame_FDserial = ones(1, Nk*Nframe*Nmod);
+            Frame_FDserial = rand(1,Nk*Nframe*Nmod) > 0.5;     % 发送的是bit
             Frame_FDparallel = reshape(Frame_FDserial,Nk,Nframe*Nmod);% 串并转换
             Frame_mod = QPSKMod(Frame_FDparallel,Nk,Nframe);     %调制
             % 做过采样ifft
@@ -87,5 +88,13 @@ for ii = 1:N_SNR
         end
     end
 end
-plot(abs(fft(frame_serial)));hold on
-plot(abs(fft(frame_passband)));
+subplot(521);plot(abs(Frame_mod));axis([0 Nfft 0 1]);title("Frame FDserial");
+subplot(522);plot(f, abs(Frame_oversampling));axis([f([1 end]) 0 1]);title("Frame oversampling");
+subplot(523);plot(f, abs(fft((frame))));axis([f([1 end]) 0 1]);title("frame");
+subplot(524);plot(f, abs(fft(frame_serial, Nfft*Nos)));axis([f([1 end]) 0 1]);title("frame GI");
+subplot(525);plot(f, abs(fft(frame_passband, Nfft*Nos)));axis([f([1 end]) 0 1]);title("frame passband");
+subplot(526);plot(f, abs(fft(frame_clipped, Nfft*Nos)));axis([f([1 end]) 0 1]);title("frame clipped");
+subplot(527);plot(f, abs(fft(frame_filter, Nfft*Nos)));axis([f([1 end]) 0 1]);title("frame filter");
+subplot(528);plot(f, abs(fft(frame_baseband, Nfft*Nos)));axis([f([1 end]) 0 1]);title("frame baseband");
+subplot(529);plot(f, abs(fft(frame_noGI)));axis([f([1 end]) 0 1]);title("frame noGI");
+subplot(5,2,10);plot(abs(Frame));axis([0 Nfft 0 1]);title("Frame");

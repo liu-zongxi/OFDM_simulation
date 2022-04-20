@@ -1,4 +1,4 @@
-%-----------------------OFDM中SNQR的计算-------------------%
+legend()%-----------------------OFDM中SNQR的计算-------------------%
 %-----------------------author:lzx-------------------------%
 %-----------------------date:2022年3月31日-----------------%
 
@@ -12,6 +12,7 @@ MaxIter=1000;           % 迭代次数
 Quantbits = [6:9];      % 量化比特数
 V_cutoffs = [2:0.2:8];  % 限幅电平
 gss=['ko-';'ks-';'k^-';'kd-'];
+SQNRdB = zeros(length(Quantbits), length(V_cutoffs));
 %%
 for ii = 1:length(Quantbits)
     Quantbit = Quantbits(ii);
@@ -32,11 +33,11 @@ for ii = 1:length(Quantbits)
 %                     x(kkk) = real(x(kkk)) + 1j*V_cutoff;
 %                 end
 %             end
-            xq=fi(x,1,Quantbit,Quantbit_fractional)
+            xq=fi(x,1,Quantbit,Quantbit_fractional);
             xq=double(xq); Px = sum(abs(x).^2); e = x-xq; Pe = sum(abs(e).^2);
             Tx = Tx + Px;  Te = Te + Pe;
         end
-        SQNRdB(ii,jj) = 10*log10(Tx/Te);
+        SQNRdB(ii,jj) = 10*log10(Tx/Te)
     end
 end
 %%
